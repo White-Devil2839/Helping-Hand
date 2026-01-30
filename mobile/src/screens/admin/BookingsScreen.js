@@ -71,7 +71,7 @@ const BookingsScreen = ({ navigation }) => {
             <TouchableOpacity
                 style={styles.bookingCard}
                 onPress={() => navigation.navigate('BookingDetail', { bookingId: item._id })}
-            >
+            >   
                 <View style={styles.bookingHeader}>
                     <Text style={styles.serviceName}>{item.service?.name}</Text>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
