@@ -1,36 +1,58 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
-import { api } from '../../services';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { useAdminUsers } from '../../hooks/useAdmin';
 import { COLORS, ROLES } from '../../config';
 
-const UsersScreen = () => {
-    const [users, setUsers] = useState([]);
-    const [loading, setLoading] = useState(true);
+const UsersScreen = ({ navigation }) => {
+    const { users, loading, fetchUsers, deactivateUser, activateUser } = useAdminUsers();
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState('all');
 
-    const fetchUsers = useCallback(async () => {
-        try {
-            const params = {};
-            if (filter !== 'all') params.role = filter;
-
-            const response = await api.get('/admin/users', { params });
-            setUsers(response.data.users);
-        } catch (err) {
-            console.error('Failed to fetch users:', err);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, [filter]);
+    const loadUsers = useCallback(async () => {
+        const params = {};
+        if (filter !== 'all') params.role = filter;
+        await fetchUsers(params);
+        setRefreshing(false);
+    }, [filter, fetchUsers]);
 
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        loadUsers();
+    }, [loadUsers]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchUsers();
+        await loadUsers();
+    };
+
+    const handleDeactivate = async (user) => {
+        Alert.alert(
+            'Deactivate User',
+            `Are you sure you want to deactivate ${user.name}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Deactivate',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deactivateUser(user._id, 'Admin action');
+                            Alert.alert('Success', 'User deactivated successfully');
+                        } catch (err) {
+                            Alert.alert('Error', err.message);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleActivate = async (user) => {
+        try {
+            await activateUser(user._id);
+            Alert.alert('Success', 'User activated successfully');
+        } catch (err) {
+            Alert.alert('Error', err.message);
+        }
     };
 
     const getRoleBadgeColor = (role) => {
@@ -43,37 +65,68 @@ const UsersScreen = () => {
     };
 
     const renderUser = ({ item }) => (
-        <View style={styles.userCard}>
+        <TouchableOpacity
+            style={styles.userCard}
+            onPress={() => navigation.navigate('UserDetail', { userId: item._id })}
+            activeOpacity={0.7}
+        >
             <View style={styles.userHeader}>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.userName}>{item.name}</Text>
                     <Text style={styles.userPhone}>{item.phone}</Text>
                 </View>
-                <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(item.role) }]}>
-                    <Text style={styles.roleText}>{item.role}</Text>
+                <View>
+                    <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(item.role) }]}>
+                        <Text style={styles.roleText}>{item.role}</Text>
+                    </View>
+                    {!item.isActive && (
+                        <View style={[styles.statusBadge, { marginTop: 4 }]}>
+                            <Text style={styles.statusText}>INACTIVE</Text>
+                        </View>
+                    )}
                 </View>
             </View>
-
             {item.role === ROLES.HELPER && item.helperProfile && (
                 <View style={styles.helperInfo}>
-                    {item.helperProfile.isVerified ? (
-                        <Text style={styles.verified}>✓ Verified</Text>
-                    ) : (
-                        <Text style={styles.pending}>⏳ Pending Verification</Text>
-                    )}
-                    {item.helperProfile.rating && (
-                        <Text style={styles.rating}>
+                    {item.helperProfile.isVerified
+                        ? <Text style={styles.verified}>✓ Verified</Text>
+                        : <Text style={styles.pending}>⏳ Pending Verification</Text>
+                    }
+                    {item.helperProfile.rating
+                        ? <Text style={styles.rating}>
                             ⭐ {item.helperProfile.rating.toFixed(1)} ({item.helperProfile.totalBookings || 0} jobs)
                         </Text>
-                    )}
+                        : null
+                    }
                 </View>
             )}
 
-            <Text style={styles.joinedDate}>
-                Joined {new Date(item.createdAt).toLocaleDateString()}
-            </Text>
-        </View>
+            <Text style={styles.joinedDate}>Joined {new Date(item.createdAt).toLocaleDateString()}</Text>
+            {/* Action Buttons */}
+            <View style={styles.actions}>
+                {item.isActive ? (
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.deactivateButton]}
+                        onPress={() => handleDeactivate(item)}
+                    >
+                        <Text style={styles.actionButtonText}>Deactivate</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.activateButton]}
+                        onPress={() => handleActivate(item)}
+                    >
+                        <Text style={styles.actionButtonText}>Activate</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        </TouchableOpacity>
     );
+
+    // Filter users based on selected role
+    const filteredUsers = filter === 'all'
+        ? users
+        : users.filter(user => user.role === filter);
 
     if (loading) {
         return (
@@ -87,7 +140,7 @@ const UsersScreen = () => {
         <View style={styles.container}>
             {/* Filter Tabs */}
             <View style={styles.filters}>
-                {['all', ROLES.CUSTOMER, ROLES.HELPER, ROLES.ADMIN].map((role) => (
+                {['all', 'customer', 'helper'].map((role) => (
                     <TouchableOpacity
                         key={role}
                         style={[styles.filterTab, filter === role && styles.activeFilter]}
@@ -101,7 +154,7 @@ const UsersScreen = () => {
             </View>
 
             <FlatList
-                data={users}
+                data={filteredUsers}
                 keyExtractor={item => item._id}
                 renderItem={renderUser}
                 contentContainerStyle={styles.list}
@@ -154,11 +207,18 @@ const styles = StyleSheet.create({
     userPhone: { fontSize: 14, color: COLORS.textSecondary, marginTop: 2 },
     roleBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
     roleText: { color: '#fff', fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
+    statusBadge: { backgroundColor: COLORS.textSecondary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
+    statusText: { color: '#fff', fontSize: 10, fontWeight: '600' },
     helperInfo: { flexDirection: 'row', marginBottom: 8, flexWrap: 'wrap' },
-    verified: { fontSize: 13, color: COLORS.secondary, fontWeight: '600' },
-    pending: { fontSize: 13, color: COLORS.warning, fontWeight: '600' },
+    verified: { fontSize: 13, color: COLORS.secondary, fontWeight: '600', marginRight: 12 },
+    pending: { fontSize: 13, color: COLORS.warning, fontWeight: '600', marginRight: 12 },
     rating: { fontSize: 13, color: COLORS.text },
-    joinedDate: { fontSize: 12, color: COLORS.textSecondary },
+    joinedDate: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 12 },
+    actions: { flexDirection: 'row', marginTop: 8 },
+    actionButton: { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center', marginHorizontal: 4 },
+    deactivateButton: { backgroundColor: COLORS.danger },
+    activateButton: { backgroundColor: COLORS.secondary },
+    actionButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
     empty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
     emptyText: { fontSize: 16, color: COLORS.textSecondary }
 });

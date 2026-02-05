@@ -27,24 +27,5 @@ router.patch(
     userController.updateMe
 );
 
-/**
- * @route   GET /api/users/helpers
- * @desc    List verified helpers
- * @access  Public
- */
-router.get(
-    '/helpers',
-    userController.listHelpers
-);
-
-/**
- * @route   GET /api/users/helpers/:id
- * @desc    Get helper profile
- * @access  Public
- */
-router.get(
-    '/helpers/:id',
-    userController.getHelper
-);
-
 module.exports = router;
+

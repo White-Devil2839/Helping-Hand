@@ -106,6 +106,7 @@ export const AuthProvider = ({ children }) => {
         verifyOtp,
         logout,
         updateProfile,
+        updateUser: setUser,
         refreshUser: checkAuth
     };
 
