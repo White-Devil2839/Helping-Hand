@@ -20,10 +20,11 @@ export const connectSocket = async () => {
 
     socket = io(SOCKET_URL, {
         auth: { token },
-        transports: ['websocket'],
+        transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        timeout: 10000
     });
 
     socket.on('connect', () => {

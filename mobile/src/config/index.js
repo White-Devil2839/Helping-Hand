@@ -1,8 +1,8 @@
 // API Configuration
 // Use 'localhost' for iOS simulator
-// Use your computer's IP (e.g., 10.2.90.203) for physical device
-export const API_URL = 'http://localhost:5006/api';
-export const SOCKET_URL = 'http://localhost:5006';
+// Use your computer's IP (e.g., 192.168.140.188) for physical device
+export const API_URL = 'http://192.168.140.188:5006/api';
+export const SOCKET_URL = 'http://192.168.140.188:5006';
 
 // App Configuration
 export const APP_NAME = 'Helping Hand';
